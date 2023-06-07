@@ -8,6 +8,8 @@ import androidx.appcompat.app.AppCompatActivity;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.os.Bundle;
+import android.view.Menu;
+import android.view.MenuItem;
 import android.widget.Toast;
 
 import com.google.android.gms.tasks.OnCompleteListener;
@@ -47,6 +49,7 @@ public class MainActivity extends AppCompatActivity {
         options.setPrompt("Press Volume up to turn on flash");
         options.setBeepEnabled(true);
         options.setOrientationLocked(true);
+
         options.setCaptureActivity(CaptureClass.class);
         barLauncher.launch(options);
 
@@ -76,17 +79,12 @@ public class MainActivity extends AppCompatActivity {
     //Barcode Implementation with response handling
     ActivityResultLauncher<ScanOptions> barLauncher = registerForActivityResult(new ScanContract(), result -> {
        if(result.getContents() != null){
-           SendDataToBackEnd(result.getContents());
-         /*  AlertDialog.Builder builder = new AlertDialog.Builder(MainActivity.this);
-           builder.setTitle("Result");
-           builder.setMessage(result.getContents());
-           builder.setPositiveButton("OK", new DialogInterface.OnClickListener() {
-               @Override
-               public void onClick(DialogInterface dialog, int which) {
-                   dialog.dismiss();
-                   ScanQR();
-               }
-           }).show();*/
+
+           if(mAuth.getCurrentUser() == null){
+               startActivity(new Intent(this,LoginActivity.class));
+           }else{
+               SendDataToBackEnd(result.getContents());
+           }
        }
     });
 
@@ -98,5 +96,29 @@ public class MainActivity extends AppCompatActivity {
         if(currentUser == null){
             startActivity(new Intent(this,LoginActivity.class));
         }
+    }
+
+    @Override
+    public void onBackPressed() {
+        super.onBackPressed();
+        Toast.makeText(this, "Back Pressed", Toast.LENGTH_SHORT).show();
+    }
+
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+        getMenuInflater().inflate(R.menu.menu, menu);
+        return super.onCreateOptionsMenu(menu);
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(@NonNull MenuItem item) {
+        int id = item.getItemId();
+        if(id == R.id.logout){
+            Toast.makeText(this, "Logout", Toast.LENGTH_SHORT).show();
+        }
+        if(id == R.id.entries){
+            Toast.makeText(this, "show entries", Toast.LENGTH_SHORT).show();
+        }
+        return super.onOptionsItemSelected(item);
     }
 }
