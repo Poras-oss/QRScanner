@@ -8,6 +8,7 @@ import android.content.DialogInterface;
 import android.content.Intent;
 import android.os.Bundle;
 
+import com.google.firebase.FirebaseApp;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
 import com.journeyapps.barcodescanner.CaptureActivity;
@@ -22,7 +23,10 @@ public class MainActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+        FirebaseApp.initializeApp(this);
         mAuth = FirebaseAuth.getInstance();
+
+        ScanQR();
     }
 
     private void ScanQR(){
@@ -44,6 +48,7 @@ public class MainActivity extends AppCompatActivity {
                @Override
                public void onClick(DialogInterface dialog, int which) {
                    dialog.dismiss();
+                   ScanQR();
                }
            }).show();
        }
