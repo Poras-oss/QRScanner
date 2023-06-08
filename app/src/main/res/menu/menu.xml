@@ -7,11 +7,12 @@
         app:showAsAction="always"
         android:icon="@drawable/ic_logout"
         />
+
     <item
-        android:id="@+id/entries"
+        android:id="@+id/scanner"
         android:title=""
         app:showAsAction="always"
-        android:icon="@drawable/ic_entries"
+        android:icon="@drawable/ic_scanner"
         />
 
 </menu>

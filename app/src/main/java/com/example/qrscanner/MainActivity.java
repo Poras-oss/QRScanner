@@ -2,9 +2,13 @@ package com.example.qrscanner;
 
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
 
+import android.app.ProgressDialog;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
@@ -13,9 +17,11 @@ import android.graphics.Color;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
+import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -26,12 +32,17 @@ import com.google.android.material.snackbar.Snackbar;
 import com.google.firebase.FirebaseApp;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
+import com.google.firebase.firestore.DocumentChange;
 import com.google.firebase.firestore.DocumentReference;
+import com.google.firebase.firestore.EventListener;
 import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.firestore.FirebaseFirestoreException;
+import com.google.firebase.firestore.QuerySnapshot;
 import com.journeyapps.barcodescanner.CaptureActivity;
 import com.journeyapps.barcodescanner.ScanContract;
 import com.journeyapps.barcodescanner.ScanOptions;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -39,6 +50,12 @@ public class MainActivity extends AppCompatActivity implements ConnectionReceive
 
     private FirebaseAuth mAuth;
     private FirebaseFirestore firestore;
+    private RecyclerView recyclerView;
+    ArrayList<String> data;
+    Adapter adapter;
+
+    ProgressBar progressBar;
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -48,7 +65,48 @@ public class MainActivity extends AppCompatActivity implements ConnectionReceive
         mAuth = FirebaseAuth.getInstance();
         firestore = FirebaseFirestore.getInstance();
 
-        ScanQR();
+        recyclerView = (RecyclerView) findViewById(R.id.recyclerView);
+        recyclerView.setHasFixedSize(true);
+        recyclerView.setLayoutManager(new LinearLayoutManager(this));
+
+
+        data = new ArrayList<>();
+
+        adapter = new Adapter(this,data);
+        recyclerView.setAdapter(adapter);
+
+        progressBar = (ProgressBar) findViewById(R.id.progressBar);
+
+
+        if(mAuth.getCurrentUser() != null){
+            progressBar.setVisibility(View.VISIBLE);
+            EventChangeListener();
+        }else{
+            startActivity(new Intent(this,LoginActivity.class));
+        }
+
+
+    }
+
+    private void EventChangeListener() {
+        firestore.collection(mAuth.getCurrentUser().getUid())
+                .addSnapshotListener(new EventListener<QuerySnapshot>() {
+                    @Override
+                    public void onEvent(@Nullable QuerySnapshot value, @Nullable FirebaseFirestoreException error) {
+                        if(error != null){
+                            progressBar.setVisibility(View.GONE);
+                            return;
+                        }
+                        for(DocumentChange dc: value.getDocumentChanges()){
+                            if(dc.getType() == DocumentChange.Type.ADDED){
+                                //data.add(dc.getDocument().toObject(DataModel.class));
+                                data.add(dc.getDocument().getData().toString());
+                            }
+                            progressBar.setVisibility(View.GONE);
+                            adapter.notifyDataSetChanged();
+                        }
+                    }
+                });
     }
 
     private void ScanQR(){
@@ -84,64 +142,26 @@ public class MainActivity extends AppCompatActivity implements ConnectionReceive
                 });
     }
 
-    //Barcode Implementation with response handling
+    //QRScanner Implementation with response handling
     ActivityResultLauncher<ScanOptions> barLauncher = registerForActivityResult(new ScanContract(), result -> {
        if(result.getContents() != null){
 
            if(mAuth.getCurrentUser() == null){
                startActivity(new Intent(this,LoginActivity.class));
            }else{
-               //SendDataToBackEnd(result.getContents());
-               checkConnection();
+              // checking the connection here to safely transfer data to database
+               if(checkConnection()){
+                   SendDataToBackEnd(result.getContents());
+               }else{
+                   Toast.makeText(this, "You're not connected to internet", Toast.LENGTH_SHORT).show();
+               }
            }
        }
     });
 
-    private void showSnackBar(boolean isConnected) {
-        String message;
-        int color;
 
-        // check condition
-        if (isConnected) {
 
-            // when internet is connected
-            // set message
-            message = "Connected to Internet";
-
-            // set text color
-            color = Color.WHITE;
-
-            Toast.makeText(this, "Connected to internet", Toast.LENGTH_SHORT).show();
-
-        } else {
-
-            // when internet
-            // is disconnected
-            // set message
-            message = "Not Connected to Internet";
-
-            // set text color
-            color = Color.RED;
-            Toast.makeText(this, "Not connected to internet", Toast.LENGTH_SHORT).show();
-        }
-
-     /*   // initialize snack bar
-        Snackbar snackbar = Snackbar.make(findViewById(R.id.imageView), message, Snackbar.LENGTH_LONG);
-
-        // initialize view
-        View view = snackbar.getView();
-
-        // Assign variable
-        TextView textView = view.findViewById(androidx.core.R.id.action_text);
-
-        // set text color
-        textView.setTextColor(color);
-
-        // show snack bar
-        snackbar.show();*/
-    }
-
-    private void checkConnection() {
+    private boolean checkConnection() {
 
         // initialize intent filter
         IntentFilter intentFilter = new IntentFilter();
@@ -164,8 +184,8 @@ public class MainActivity extends AppCompatActivity implements ConnectionReceive
         // get connection status
         boolean isConnected = networkInfo != null && networkInfo.isConnectedOrConnecting();
 
-        // display snack bar
-        showSnackBar(isConnected);
+        return isConnected;
+
     }
 
     @Override
@@ -188,17 +208,22 @@ public class MainActivity extends AppCompatActivity implements ConnectionReceive
     public boolean onOptionsItemSelected(@NonNull MenuItem item) {
         int id = item.getItemId();
         if(id == R.id.logout){
-            mAuth.signOut();
+            FirebaseAuth.getInstance().signOut();
             finish();
         }
-        if(id == R.id.entries){
-            Toast.makeText(this, "show entries", Toast.LENGTH_SHORT).show();
+
+        if(id == R.id.scanner){
+            ScanQR();
         }
         return super.onOptionsItemSelected(item);
     }
 
     @Override
     public void onNetworkChange(boolean isConnected) {
-
+        if(isConnected){
+            Toast.makeText(this, "Connected to internet!", Toast.LENGTH_SHORT).show();
+        }else{
+            Toast.makeText(this, "No active internet connection", Toast.LENGTH_SHORT).show();
+        }
     }
 }
